@@ -1,20 +1,116 @@
+// Copyright 2013 The Flutter Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
+import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 
-import 'src/app.dart';
-import 'src/settings/settings_controller.dart';
-import 'src/settings/settings_service.dart';
+import 'animate_camera.dart';
+import 'lite_mode.dart';
+import 'map_click.dart';
+import 'map_coordinates.dart';
+import 'map_map_id.dart';
+import 'map_ui.dart';
+import 'marker_icons.dart';
+import 'move_camera.dart';
+import 'padding.dart';
+import 'page.dart';
+import 'place_circle.dart';
+import 'place_marker.dart';
+import 'place_polygon.dart';
+import 'place_polyline.dart';
+import 'scrolling_map.dart';
+import 'snapshot.dart';
+import 'tile_overlay.dart';
 
-void main() async {
-  // Set up the SettingsController, which will glue user settings to multiple
-  // Flutter Widgets.
-  final settingsController = SettingsController(SettingsService());
+final List<GoogleMapExampleAppPage> _allPages = <GoogleMapExampleAppPage>[
+  const MapUiPage(),
+  const MapCoordinatesPage(),
+  const MapClickPage(),
+  const AnimateCameraPage(),
+  const MoveCameraPage(),
+  const PlaceMarkerPage(),
+  const MarkerIconsPage(),
+  const ScrollingMapPage(),
+  const PlacePolylinePage(),
+  const PlacePolygonPage(),
+  const PlaceCirclePage(),
+  const PaddingPage(),
+  const SnapshotPage(),
+  const LiteModePage(),
+  const TileOverlayPage(),
+  const MapIdPage(),
+];
 
-  // Load the user's preferred theme while the splash screen is displayed.
-  // This prevents a sudden theme change when the app is first displayed.
-  await settingsController.loadSettings();
+/// MapsDemo is the Main Application.
+class MapsDemo extends StatelessWidget {
+  /// Default Constructor
+  const MapsDemo({super.key});
 
-  // Run the app and pass in the SettingsController. The app listens to the
-  // SettingsController for changes, then passes it further down to the
-  // SettingsView.
-  runApp(MyApp(settingsController: settingsController));
+  void _pushPage(BuildContext context, GoogleMapExampleAppPage page) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+        builder: (_) => Scaffold(
+              appBar: AppBar(title: Text(page.title)),
+              body: page,
+            )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('GoogleMaps examples')),
+      body: ListView.builder(
+        itemCount: _allPages.length,
+        itemBuilder: (_, int index) => ListTile(
+          leading: _allPages[index].leading,
+          title: Text(_allPages[index].title),
+          onTap: () => _pushPage(context, _allPages[index]),
+        ),
+      ),
+    );
+  }
+}
+
+void main() {
+  final GoogleMapsFlutterPlatform mapsImplementation =
+      GoogleMapsFlutterPlatform.instance;
+  if (mapsImplementation is GoogleMapsFlutterAndroid) {
+    mapsImplementation.useAndroidViewSurface = true;
+    initializeMapRenderer();
+  }
+  runApp(const MaterialApp(home: MapsDemo()));
+}
+
+Completer<AndroidMapRenderer?>? _initializedRendererCompleter;
+
+/// Initializes map renderer to the `latest` renderer type for Android platform.
+///
+/// The renderer must be requested before creating GoogleMap instances,
+/// as the renderer can be initialized only once per application context.
+Future<AndroidMapRenderer?> initializeMapRenderer() async {
+  if (_initializedRendererCompleter != null) {
+    return _initializedRendererCompleter!.future;
+  }
+
+  final Completer<AndroidMapRenderer?> completer =
+      Completer<AndroidMapRenderer?>();
+  _initializedRendererCompleter = completer;
+
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final GoogleMapsFlutterPlatform mapsImplementation =
+      GoogleMapsFlutterPlatform.instance;
+  if (mapsImplementation is GoogleMapsFlutterAndroid) {
+    unawaited(mapsImplementation
+        .initializeWithRenderer(AndroidMapRenderer.latest)
+        .then((AndroidMapRenderer initializedRenderer) =>
+            completer.complete(initializedRenderer)));
+  } else {
+    completer.complete(null);
+  }
+
+  return completer.future;
 }
